@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediFlow Tech - Análise de Atendimentos e Metas (v9.1.3)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif; 
+            background-color: #eef2f7; 
+            color: #333;
+        }
+        .table-container {
+            max-height: 350px; 
+            overflow-y: auto; 
+        }
+        .chart-container { /* Para gráficos de rosca/pizza */
+            position: relative;
+            margin: auto;
+            height: 250px; 
+            width: 100%;
+            max-width: 350px; 
+        }
+        .bar-chart-container { /* Para gráficos de barra */
+            position: relative;
+            margin: auto;
+            height: 330px; 
+            width: 100%;
+        }
+        .dental-bar-chart-container { /* Específico para o novo gráfico de odonto */
+             position: relative;
+            margin: auto;
+            height: 280px; /* Altura pode ser ajustada */
+            width: 100%;
+            max-width: 500px; /* Pode ser mais largo se necessário */
+        }
+        .toast-container { 
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            z-index: 1055;
+        }
+        .logo-container {
+            max-width: 200px; 
+            margin-bottom: 0.8rem;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08); 
+        }
+        .goal-met { color: var(--bs-success); } 
+        .goal-not-met { color: var(--bs-danger); } 
+        
+        :root {
+            --bs-primary: #0d6efd; 
+            --bs-secondary: #6c757d; 
+            --bs-success: #198754; 
+            --bs-info: #0dcaf0;    
+            --bs-warning: #ffc107; 
+            --bs-danger: #dc3545;  
+            --bs-light: #f8f9fa;   
+            --bs-dark: #212529;    
+        }
+        .btn-primary {
+            background-color: var(--bs-primary);
+            border-color: var(--bs-primary);
+        }
+        .btn-primary:hover {
+            background-color: #0b5ed7; 
+            border-color: #0a58ca;
+        }
+        .text-primary { color: var(--bs-primary) !important; }
+        .bg-primary-subtle { background-color: #cfe2ff !important; } 
+        .border-primary-subtle { border-color: #cfe2ff !important; }
+        .spinner-border { width: 2rem; height: 2rem; }
+    </style>
+</head>
+<body class="d-flex align-items-center justify-content-center min-vh-100 p-3 p-md-4">
+
+    <div id="loginScreen" class="container" style="max-width: 450px;">
+        <div class="card p-4 p-md-5">
+            <div class="text-center mb-4">
+                <img src="https://storage.googleapis.com/generativeai-downloads/images/d58dce57-5745-4aca-a55e-8b4cea39eb10" alt="Logótipo MediFlow Tech" class="mx-auto h-auto mb-3" style="max-width: 180px;" onerror="this.onerror=null; this.src='https://placehold.co/180x45/007bff/ffffff?text=MediFlow+Tech&font=roboto';">
+                <h1 class="h3 mb-0 fw-bold">Acesso ao Sistema</h1>
+            </div>
+            <div class="mb-3">
+                <label for="username" class="form-label">Utilizador</label>
+                <input type="text" id="username" class="form-control form-control-lg" autocomplete="off">
+            </div>
+            <div class="mb-4">
+                <label for="password" class="form-label">Senha</label>
+                <input type="password" id="password" class="form-control form-control-lg" autocomplete="off">
+            </div>
+            <button id="loginButton" class="btn btn-primary btn-lg w-100">Entrar</button>
+            <p id="loginMessage" class="mt-3 text-center text-danger small"></p>
+        </div>
+    </div>
+
+    <div id="mainAppScreen" class="d-none container-fluid"> 
+        <div class="card p-4 p-md-5">
+            <header class="mb-5 text-center">
+                <div class="logo-container mx-auto">
+                    <img src="https://storage.googleapis.com/generativeai-downloads/images/d58dce57-5745-4aca-a55e-8b4cea39eb10" alt="Logótipo MediFlow Tech" class="img-fluid" onerror="this.onerror=null; this.src='https://placehold.co/220x50/007bff/ffffff?text=MediFlow+Tech&font=roboto';">
+                </div>
+                <h1 class="h2 mb-1 fw-bold text-primary">Relatório de Análise de Atendimentos e Metas</h1>
+            </header>
+
+            <div class="row g-4 mb-5">
+                <div class="col-lg-6">
+                    <label for="rawData" class="form-label">Dados do Relatório (Texto):</label>
+                    <textarea id="rawData" rows="12" class="form-control" placeholder="Cole aqui o texto estruturado do seu relatório..."></textarea>
+                </div>
+                <div class="col-lg-6 d-flex flex-column justify-content-between">
+                    <div>
+                        <label for="fileUpload" class="form-label">Ou Carregar Ficheiro .txt:</label>
+                        <input type="file" id="fileUpload" accept=".txt" class="form-control">
+                    </div>
+                     <button id="processData" class="btn btn-primary btn-lg w-100 mt-3 mt-lg-0">
+                        <i class="bi bi-bar-chart-line-fill me-2"></i>Analisar Dados
+                    </button>
+                </div>
+            </div>
+            
+            <div id="resultsArea" class="mt-5 d-none">
+                <h2 class="h3 fw-bold text-center mb-4">Resultados da Análise</h2>
+                
+                <div id="goalsAnalysisSection" class="mb-5 p-4 border border-primary-subtle rounded bg-primary-subtle">
+                    <h3 class="h4 fw-semibold text-primary mb-4 text-center">Progresso das Metas e Análise IA</h3>
+                    <div class="row g-lg-3 g-4 mb-4 align-items-stretch"> 
+                        <div class="col-lg-4 col-md-6 d-flex">
+                            <div class="card p-3 w-100">
+                                <h4 class="h5 fw-semibold text-center mb-3">Especialidades Médicas</h4>
+                                <div class="chart-container mx-auto mb-2"> <canvas id="medicalGoalChart"></canvas> </div>
+                                <p class="text-center small mb-1">Meta (PC+R+I): <span id="medicalGoalTarget" class="fw-bold">4.400</span></p>
+                                <p class="text-center small mb-1">Total Válido: <span id="medicalGoalActual" class="fw-bold">0</span></p>
+                                <p class="text-center small mb-1">Atingido: <span id="medicalGoalPercentage" class="fw-bold">0%</span></p>
+                                <p id="medicalGoalStatus" class="text-center fw-bold small mt-1"></p>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-6 d-flex">
+                            <div class="card p-3 w-100">
+                                <h4 class="h5 fw-semibold text-center mb-3">Serviços Não Médicos</h4>
+                                <div class="chart-container mx-auto mb-2"> <canvas id="nonMedicalGoalChart"></canvas> </div>
+                                <p class="text-center small mb-1">Meta (R+I+S): <span id="nonMedicalGoalTarget" class="fw-bold">4.300</span></p>
+                                <p class="text-center small mb-1">Total Válido: <span id="nonMedicalGoalActual" class="fw-bold">0</span></p>
+                                <p class="text-center small mb-1">Atingido: <span id="nonMedicalGoalPercentage" class="fw-bold">0%</span></p>
+                                <p id="nonMedicalGoalStatus" class="text-center fw-bold small mt-1"></p>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-md-12 d-flex mt-4 mt-lg-0"> 
+                            <div class="card p-3 w-100">
+                                <h4 class="h5 fw-semibold text-center mb-3">Odontologia</h4>
+                                <div class="chart-container mx-auto mb-2"> <canvas id="dentalGoalChart"></canvas> </div>
+                                <p class="text-center small mb-1">Meta Total: <span id="dentalGoalTotalTarget" class="fw-bold">600</span></p>
+                                <p class="text-center small mb-1">Total Atual (PC+CS): <span id="dentalGoalActual" class="fw-bold">0</span></p>
+                                <p class="text-center small mb-1">Atingido: <span id="dentalGoalPercentage" class="fw-bold">0%</span></p>
+                                <p id="dentalGoalStatus" class="text-center fw-bold small mt-1"></p>
+                                <hr class="my-2">
+                                <p class="text-center small mb-0">Primeira Consulta: <span id="dentalFirstConsultActual">0</span> / <span id="dentalFirstConsultTarget">240</span></p>
+                                <p class="text-center small mb-0">Consulta Subsequente: <span id="dentalSubsequentConsultActual">0</span> / <span id="dentalSubsequentConsultTarget">360</span></p>
+                            </div>
+                        </div>
+                    </div>
+                     <div id="geminiSuggestionsArea" class="mt-4">
+                        <h4 class="h5 fw-semibold text-primary mb-2 text-center">Análise e Sugestões (IA)</h4>
+                        <div id="geminiLoader" class="d-none spinner-border text-primary mx-auto" role="status"><span class="visually-hidden">Loading...</span></div>
+                        <div id="geminiOutput" class="p-3 border rounded bg-light small min-vh-[100px]">
+                            Aguardando processamento dos dados...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-6">
+                        <div class="card p-3">
+                            <h3 class="h5 fw-semibold text-center mb-3">Atendimentos por Especialidade Médica (Meta)</h3>
+                            <div class="bar-chart-container"> <canvas id="medicalSpecialtyChart"></canvas> </div>
+                        </div>
+                    </div>
+                     <div class="col-lg-6">
+                        <div class="card p-3">
+                            <h3 class="h5 fw-semibold text-center mb-3">Atendimentos por Serviço Não Médico (Meta)</h3>
+                            <div class="bar-chart-container"> <canvas id="nonMedicalServiceChart"></canvas> </div>
+                        </div>
+                    </div>
+                </div>
+                 <div class="row g-4 mb-4 justify-content-center">
+                    <div class="col-lg-6">
+                        <div class="card p-3">
+                            <h3 class="h5 fw-semibold text-center mb-3">Atendimentos Odontologia (Tipos)</h3>
+                            <div class="dental-bar-chart-container"> <canvas id="dentalAttendanceChart"></canvas> </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mb-3">
+                     <button id="toggleDetailsButton" class="btn btn-outline-secondary btn-sm"><i class="bi bi-table me-2"></i>Mostrar/Ocultar Tabelas Detalhadas</button>
+                </div>
+
+                <div id="detailedTablesContainer" class="d-none">
+                    <div class="mb-5 card p-3">
+                        <h3 class="h4 fw-semibold text-center mb-3">Especialidades Médicas (Detalhado)</h3>
+                        <div class="table-responsive table-container">
+                            <table class="table table-striped table-hover table-sm">
+                                <thead id="medicalTableHead" class="table-light sticky-top"></thead>
+                                <tbody id="medicalTableBody"></tbody>
+                                <tfoot id="medicalTableFoot" class="table-light fw-bold sticky-bottom"></tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="mb-5 card p-3">
+                        <h3 class="h4 fw-semibold text-center mb-3">Serviços Não Médicos (Detalhado)</h3>
+                        <div class="table-responsive table-container">
+                            <table class="table table-striped table-hover table-sm">
+                                <thead id="nonMedicalTableHead" class="table-light sticky-top"></thead>
+                                <tbody id="nonMedicalTableBody"></tbody>
+                                <tfoot id="nonMedicalTableFoot" class="table-light fw-bold sticky-bottom"></tfoot>
+                            </table>
+                        </div>
+                    </div>
+                     <div class="mb-5 card p-3">
+                        <h3 class="h4 fw-semibold text-center mb-3">Odontologia (Detalhado)</h3>
+                        <div class="table-responsive table-container">
+                            <table class="table table-striped table-hover table-sm">
+                                <thead id="dentalTableHead" class="table-light sticky-top"></thead>
+                                <tbody id="dentalTableBody"></tbody>
+                                <tfoot id="dentalTableFoot" class="table-light fw-bold sticky-bottom"></tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-center gap-3 mb-4">
+                    <button id="exportCSV" class="btn btn-success"><i class="bi bi-file-earmark-spreadsheet-fill me-2"></i>Exportar para CSV</button>
+                    <button id="exportPDF" class="btn btn-danger"><i class="bi bi-file-earmark-pdf-fill me-2"></i>Exportar para PDF</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container">
+        <div id="toastNotification" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto">Notificação</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                Mensagem aqui.
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // --- Credenciais de Login ---
+    const FIXED_USERNAME = "RH07653";
+    const FIXED_PASSWORD = "1023";
+
+    // --- Listas de Serviços Padronizados para Exibição nas Tabelas ---
+    const MEDICAL_SERVICES_FOR_TABLE_DISPLAY = [
+        "ANESTESIOLOGIA", "CIRURGIA VASCULAR", "CARDIOLOGIA", "CLINICA GERAL", "DERMATOLOGIA", 
+        "ENDOCRINOLOGIA", "GASTROENTEROLOGIA", "GINECOLOGIA", "GINECOLOGIA/OBSTETRICIA", 
+        "INFECTOLOGIA", "MASTOLOGIA", "NEFROLOGIA", "NEUROLOGIA", "OFTALMOLOGIA", 
+        "ORTOPEDIA/TRAUMATOLOGIA", "OTORRINOLARINGOLOGIA", "PEDIATRIA CLINICA", "PNEUMOLOGIA", 
+        "PSIQUIATRIA", "REUMATOLOGIA", "UROLOGIA"
+    ];
+
+    const NON_MEDICAL_SERVICES_FOR_TABLE_DISPLAY = [
+        "ENFERMAGEM", "ASSISTENTE SOCIAL", "NUTRICIONISTA", "FISIOTERAPIA",
+        "PSICOLOGIA", "FARMACIA"
+    ];
+    const DENTAL_SERVICE_DISPLAY_NAME = "ODONTOLOGIA";
+
+    const SERVICE_NAME_MAP = {
+        "ANESTESIOLOGIA": "ANESTESIOLOGIA",
+        "ANGIOLOGIA/CIRURGIA VASCULAR": "CIRURGIA VASCULAR",
+        "CARDIOLOGIA": "CARDIOLOGIA",
+        "CLÍNICO GERAL – LINHA DO CUIDADO": "CLINICA GERAL",
+        "CLINICO GERAL": "CLINICA GERAL",
+        "CLÍNICA GERAL": "CLINICA GERAL",
+        "COLOPROCTOLOGIA": "COLOPROCTOLOGIA", 
+        "DERMATOLOGIA": "DERMATOLOGIA",
+        "ENDOCRINOLOGIA": "ENDOCRINOLOGIA",
+        "ENDOCRINO/METABOLOGIA": "ENDOCRINOLOGIA",
+        "GASTROENTEROLOGIA": "GASTROENTEROLOGIA",
+        "GINECOLOGIA": "GINECOLOGIA",
+        "GINECOLOGIA OBSTETRÍCIA": "GINECOLOGIA/OBSTETRICIA",
+        "GINECOLOGIA/OBSTETRICIA": "GINECOLOGIA/OBSTETRICIA",
+        "HEMATOLOGIA": "HEMATOLOGIA", 
+        "INFECTOLOGIA": "INFECTOLOGIA",
+        "MASTOLOGIA": "MASTOLOGIA",
+        "NEFROLOGIA": "NEFROLOGIA",
+        "NEUROLOGIA": "NEUROLOGIA",
+        "OFTALMOLOGIA": "OFTALMOLOGIA",
+        "ORTOPEDIA/TRAUMATOLOGIA": "ORTOPEDIA/TRAUMATOLOGIA",
+        "OTORRINOLARINGOLOGIA": "OTORRINOLARINGOLOGIA",
+        "PEDIATRIA": "PEDIATRIA CLINICA",
+        "PEDIATRIA CLÍNICA": "PEDIATRIA CLINICA",
+        "PEDIATRIA CLINICA": "PEDIATRIA CLINICA",
+        "PNEUMOLOGIA": "PNEUMOLOGIA",
+        "PNEUMOLOGIA/TISIOLOGIA": "PNEUMOLOGIA",
+        "PSIQUIATRIA": "PSIQUIATRIA",
+        "REUMATOLOGIA": "REUMATOLOGIA",
+        "UROLOGIA": "UROLOGIA",
+        "ODONTOLOGIA": "ODONTOLOGIA", 
+
+        "ENFERMEIRO": "ENFERMAGEM",
+        "ENFERMAGEM": "ENFERMAGEM",
+        "FARMACÊUTICO": "FARMACIA",
+        "FARMACIA": "FARMACIA",
+        "FISIOTERAPEUTA": "FISIOTERAPIA",
+        "FISIOTERAPIA": "FISIOTERAPIA",
+        "FONOAUDIÓLOGO": "FONOAUDIÓLOGO", 
+        "NUTRICIONISTA": "NUTRICIONISTA",
+        "PSICÓLOGO": "PSICOLOGIA",
+        "PSICOLOGIA": "PSICOLOGIA",
+        "TERAPIA OCUPACIONAL": "TERAPIA OCUPACIONAL", 
+        "ASSISTENTE SOCIAL": "ASSISTENTE SOCIAL"
+    };
+
+    const MEDICAL_GOAL_TYPES = ["Primeira Consulta", "Retorno", "Interconsulta"];
+    const NON_MEDICAL_GOAL_TYPES = ["Retorno", "Interconsulta", "Sessão"];
+    const DENTAL_FIRST_CONSULT_TARGET = 240;
+    const DENTAL_SUBSEQUENT_CONSULT_TARGET = 360;
+    const DENTAL_TOTAL_GOAL_TARGET = DENTAL_FIRST_CONSULT_TARGET + DENTAL_SUBSEQUENT_CONSULT_TARGET;
+    const MEDICAL_GOAL_TARGET_VALUE = 4400;
+    const NON_MEDICAL_GOAL_TARGET_VALUE = 4300;
+
+    const MEDICAL_TABLE_DISPLAY_COLUMNS = ["Primeira Consulta", "Retorno", "Interconsulta"];
+    const NON_MEDICAL_TABLE_DISPLAY_COLUMNS = ["Retorno", "Interconsulta", "Sessão"];
+    const DENTAL_TABLE_DISPLAY_COLUMNS = ["Primeira Consulta", "Consulta Subsequente"];
+
+    const ATTENDANCE_TYPE_MAP = {
+        "PRIMEIRA CONSULTA": "Primeira Consulta", "1 PRIMEIRA CONSULTA": "Primeira Consulta",
+        "RETORNO": "Retorno", "2 RETORNO": "Retorno",
+        "INTERCONSULTA": "Interconsulta", "15 INTERCONSULTA": "Interconsulta",
+        "SESSÃO": "Sessão", "SESSAO": "Sessão", "37 SESSÃO": "Sessão", "37 SESSAO": "Sessão",
+        "PROCEDIMENTO FARMACIA": "Procedimento Farmácia", "PROCEDIMENTO FARMÁCIA": "Procedimento Farmácia",
+        "73 PROCEDIMENTO FARMACIA": "Procedimento Farmácia" 
+    };
+    const ALL_POSSIBLE_PARSED_TYPES = ["Primeira Consulta", "Retorno", "Interconsulta", "Sessão", "Procedimento Farmácia", "Outros"];
+
+    const loginScreen = document.getElementById('loginScreen');
+    const mainAppScreen = document.getElementById('mainAppScreen');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const loginButton = document.getElementById('loginButton');
+    const loginMessage = document.getElementById('loginMessage');
+    const rawDataInput = document.getElementById('rawData');
+    const fileUploadInput = document.getElementById('fileUpload');
+    const processDataButton = document.getElementById('processData');
+    const resultsArea = document.getElementById('resultsArea');
+    const medicalGoalTargetEl = document.getElementById('medicalGoalTarget');
+    const medicalGoalActualEl = document.getElementById('medicalGoalActual');
+    const medicalGoalPercentageEl = document.getElementById('medicalGoalPercentage');
+    const medicalGoalStatusEl = document.getElementById('medicalGoalStatus');
+    const nonMedicalGoalTargetEl = document.getElementById('nonMedicalGoalTarget');
+    const nonMedicalGoalActualEl = document.getElementById('nonMedicalGoalActual');
+    const nonMedicalGoalPercentageEl = document.getElementById('nonMedicalGoalPercentage');
+    const nonMedicalGoalStatusEl = document.getElementById('nonMedicalGoalStatus');
+    const dentalGoalTotalTargetEl = document.getElementById('dentalGoalTotalTarget');
+    const dentalGoalActualEl = document.getElementById('dentalGoalActual');
+    const dentalGoalPercentageEl = document.getElementById('dentalGoalPercentage');
+    const dentalGoalStatusEl = document.getElementById('dentalGoalStatus');
+    const dentalFirstConsultActualEl = document.getElementById('dentalFirstConsultActual');
+    const dentalFirstConsultTargetEl = document.getElementById('dentalFirstConsultTarget');
+    const dentalSubsequentConsultActualEl = document.getElementById('dentalSubsequentConsultActual');
+    const dentalSubsequentConsultTargetEl = document.getElementById('dentalSubsequentConsultTarget');
+    const geminiLoader = document.getElementById('geminiLoader');
+    const geminiOutput = document.getElementById('geminiOutput');
+    const toggleDetailsButton = document.getElementById('toggleDetailsButton');
+    const detailedTablesContainer = document.getElementById('detailedTablesContainer');
+    const medicalTableHeadEl = document.getElementById('medicalTableHead');
+    const medicalTableBodyEl = document.getElementById('medicalTableBody');
+    const medicalTableFootEl = document.getElementById('medicalTableFoot');
+    const nonMedicalTableHeadEl = document.getElementById('nonMedicalTableHead');
+    const nonMedicalTableBodyEl = document.getElementById('nonMedicalTableBody');
+    const nonMedicalTableFootEl = document.getElementById('nonMedicalTableFoot');
+    const dentalTableHeadEl = document.getElementById('dentalTableHead');
+    const dentalTableBodyEl = document.getElementById('dentalTableBody');
+    const dentalTableFootEl = document.getElementById('dentalTableFoot');
+    const exportCSVButton = document.getElementById('exportCSV');
+    const exportPDFButton = document.getElementById('exportPDF');
+    let toastInstance = null; 
+    let processedDataGlobal = [];
+    let medicalGoalChartInstance, nonMedicalGoalChartInstance, dentalGoalChartInstance,
+        medicalSpecialtyChartInstance, nonMedicalServiceChartInstance, dentalAttendanceChartInstance; // Adicionado dentalAttendanceChartInstance
+
+    medicalGoalTargetEl.textContent = MEDICAL_GOAL_TARGET_VALUE.toLocaleString('pt-BR');
+    nonMedicalGoalTargetEl.textContent = NON_MEDICAL_GOAL_TARGET_VALUE.toLocaleString('pt-BR');
+    dentalGoalTotalTargetEl.textContent = DENTAL_TOTAL_GOAL_TARGET.toLocaleString('pt-BR');
+    dentalFirstConsultTargetEl.textContent = DENTAL_FIRST_CONSULT_TARGET.toLocaleString('pt-BR');
+    dentalSubsequentConsultTargetEl.textContent = DENTAL_SUBSEQUENT_CONSULT_TARGET.toLocaleString('pt-BR');
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const toastEl = document.getElementById('toastNotification');
+        if (toastEl) {
+            toastInstance = new bootstrap.Toast(toastEl, { delay: 3000 });
+        }
+        toggleDetailsButton.addEventListener('click', () => {
+            detailedTablesContainer.classList.toggle('d-none');
+        });
+    });
+
+    function showToast(message) {
+        const toastBody = document.querySelector('#toastNotification .toast-body');
+        if (toastBody) {
+            toastBody.textContent = message;
+            if (toastInstance) toastInstance.show();
+        } else { 
+            alert(message);
+        }
+    }
+
+    function initializeServiceAttendance() {
+        const attendances = {};
+        ALL_POSSIBLE_PARSED_TYPES.forEach(type => attendances[type] = 0);
+        return attendances;
+    }
+
+    function normalizeAttendanceType(rawType) {
+        const upperRawType = rawType.trim().toUpperCase();
+        if (ATTENDANCE_TYPE_MAP[upperRawType]) return ATTENDANCE_TYPE_MAP[upperRawType];
+        const typeWithoutLeadingDigits = upperRawType.replace(/^\d+\s*/, '').trim();
+        if (ATTENDANCE_TYPE_MAP[typeWithoutLeadingDigits]) return ATTENDANCE_TYPE_MAP[typeWithoutLeadingDigits];
+        const matchedParsedType = ALL_POSSIBLE_PARSED_TYPES.find(c => c.toUpperCase() === typeWithoutLeadingDigits);
+        if (matchedParsedType) return matchedParsedType;
+        console.warn(`Tipo de atendimento não mapeado: '${rawType}'`);
+        return "Outros";
+    }
+
+    loginButton.addEventListener('click', () => {
+        if (usernameInput.value === FIXED_USERNAME && passwordInput.value === FIXED_PASSWORD) {
+            loginScreen.classList.add('d-none'); 
+            mainAppScreen.classList.remove('d-none');
+            loginMessage.textContent = '';
+        } else {
+            loginMessage.textContent = 'Acesso negado. Utilizador ou senha incorretos.';
+            showToast('Acesso negado!');
+        }
+    });
+
+    processDataButton.addEventListener('click', () => {
+        const textFromTextArea = rawDataInput.value;
+        if (textFromTextArea.trim()) {
+            processRawText(textFromTextArea);
+        } else if (fileUploadInput.files.length > 0) {
+            const file = fileUploadInput.files[0];
+            if (!file.name.toLowerCase().endsWith(".txt")) {
+                showToast('Formato de ficheiro inválido. Por favor, carregue um ficheiro .txt.');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                rawDataInput.value = e.target.result;
+                processRawText(e.target.result);
+            };
+            reader.onerror = () => showToast('Erro ao ler o ficheiro.');
+            reader.readAsText(file);
+        } else {
+            showToast('Por favor, insira dados na área de texto ou carregue um ficheiro .txt.');
+            resultsArea.classList.add('d-none');
+        }
+    });
+
+    function getStandardServiceNameAndType(inputNameFromText) {
+        const normalizedInput = inputNameFromText.toUpperCase().replace(/\s+/g, ' ').replace('–', '-');
+        const mappedName = SERVICE_NAME_MAP[normalizedInput] || normalizedInput; 
+        
+        if (mappedName === DENTAL_SERVICE_DISPLAY_NAME.toUpperCase()) {
+            return { name: DENTAL_SERVICE_DISPLAY_NAME, type: "Odontológico" };
+        }
+        const medicalDisplayMatch = MEDICAL_SERVICES_FOR_TABLE_DISPLAY.find(s => s.toUpperCase() === mappedName.toUpperCase());
+        if (medicalDisplayMatch) {
+            return { name: medicalDisplayMatch, type: "Médico" };
+        }
+        const nonMedicalDisplayMatch = NON_MEDICAL_SERVICES_FOR_TABLE_DISPLAY.find(s => s.toUpperCase() === mappedName.toUpperCase());
+        if (nonMedicalDisplayMatch) {
+            return { name: nonMedicalDisplayMatch, type: "Não Médico" };
+        }
+        
+        console.warn(` -> Serviço "${mappedName}" (de input "${inputNameFromText}") não encontrado nas listas de exibição. Classificado como Desconhecido.`);
+        return { name: mappedName, type: "Desconhecido" };
+    }
+
+
+    function processRawText(textData) {
+        console.log("Iniciando processamento de texto bruto...");
+        const lines = textData.split('\n').map(line => line.trim()).filter(line => line);
+        let tempProcessedData = []; 
+        let currentServiceData = null;
+
+        const firstServiceLineRegex = /^(\d+)\s+((?:[A-ZÇÁÉÍÓÚÀÂÊÔÃÕÜÑ]+\s*[\/\-–]?\s*)+)(?:\s+((?:\d+\s+)?[A-ZÇÁÉÍÓÚÀÂÊÔÃÕÜÑ]+(?:\s+[A-ZÇÁÉÍÓÚÀÂÊÔÃÕÜÑ]+)*)\s+(\d+))?$/i;
+        const subsequentAttendanceLineRegex = /^((?:\d+\s+)?[A-ZÇÁÉÍÓÚÀÂÊÔÃÕÜÑ]+(?:\s+[A-ZÇÁÉÍÓÚÀÂÊÔÃÕÜÑ]+)*)\s+(\d+)$/i;
+
+        for (const line of lines) {
+            const totalMatch = line.match(/^Total do Serviço:\s*(\d+)$/i);
+            if (totalMatch) {
+                if (currentServiceData) {
+                    currentServiceData.totalFromText = parseInt(totalMatch[1]);
+                    tempProcessedData.push(currentServiceData); 
+                    console.log("Serviço finalizado e ADICIONADO (temporariamente):", currentServiceData.name, "Tipo:", currentServiceData.type);
+                    currentServiceData = null; 
+                }
+                continue;
+            }
+
+            let match = line.match(firstServiceLineRegex);
+            if (match) {
+                if (currentServiceData) { 
+                    tempProcessedData.push(currentServiceData);
+                    console.log("Serviço anterior (sem total explícito) finalizado e ADICIONADO (temporariamente):", currentServiceData.name, "Tipo:", currentServiceData.type);
+                }
+                
+                const serviceId = match[1].trim();
+                let serviceNameInput = match[2].trim(); 
+                const { name: serviceName, type: serviceType } = getStandardServiceNameAndType(serviceNameInput);
+                
+                currentServiceData = {
+                    id: serviceId, name: serviceName, type: serviceType,
+                    attendances: initializeServiceAttendance(), totalCalculated: 0, totalFromText: null
+                };
+                console.log(`Novo serviço iniciado: ID=${serviceId}, NomeInput="${serviceNameInput}", NomePadronizado="${serviceName}", Tipo="${serviceType}"`);
+
+                if (match[3] && match[4]) { 
+                    const rawAttendanceName = match[3].trim();
+                    const quantity = parseInt(match[4]);
+                    const normalizedType = normalizeAttendanceType(rawAttendanceName);
+                    console.log(`  Primeiro atendimento para ${serviceName}: ${rawAttendanceName} (${normalizedType}) - Qtd: ${quantity}`);
+                    currentServiceData.attendances[normalizedType] = (currentServiceData.attendances[normalizedType] || 0) + quantity;
+                }
+            } else if (currentServiceData) { 
+                match = line.match(subsequentAttendanceLineRegex);
+                if (match) {
+                    const rawAttendanceName = match[1].trim();
+                    const quantity = parseInt(match[2]);
+                    const normalizedType = normalizeAttendanceType(rawAttendanceName);
+                    console.log(`  Atendimento subsequente para ${currentServiceData.name}: ${rawAttendanceName} (${normalizedType}) - Qtd: ${quantity}`);
+                    currentServiceData.attendances[normalizedType] = (currentServiceData.attendances[normalizedType] || 0) + quantity;
+                } else {
+                    console.warn(`  Linha não reconhecida para o serviço ${currentServiceData.name}: "${line}"`);
+                }
+            } else {
+                console.warn(`Linha ignorada (sem serviço ativo e não é início de serviço): "${line}"`);
+            }
+        }
+        if (currentServiceData) { 
+            tempProcessedData.push(currentServiceData);
+            console.log("Último serviço finalizado e ADICIONADO (temporariamente):", currentServiceData.name, "Tipo:", currentServiceData.type);
+        }
+        
+        processedDataGlobal = [];
+        
+        MEDICAL_SERVICES_FOR_TABLE_DISPLAY.forEach(displayName => {
+            const foundService = tempProcessedData.find(s => s.name.toUpperCase() === displayName.toUpperCase() && s.type === "Médico");
+            const serviceToAdd = foundService || {
+                id: foundService ? foundService.id : '-', 
+                name: displayName, type: "Médico",
+                attendances: initializeServiceAttendance(), totalCalculated: 0, totalFromText: null
+            };
+            if(foundService) serviceToAdd.attendances = foundService.attendances; 
+            serviceToAdd.totalCalculated = Object.values(serviceToAdd.attendances).reduce((sum, val) => sum + val, 0);
+            processedDataGlobal.push(serviceToAdd);
+        });
+
+        NON_MEDICAL_SERVICES_FOR_TABLE_DISPLAY.forEach(displayName => {
+            const foundService = tempProcessedData.find(s => s.name.toUpperCase() === displayName.toUpperCase() && s.type === "Não Médico");
+            const serviceToAdd = foundService || {
+                id: foundService ? foundService.id : '-', 
+                name: displayName, type: "Não Médico",
+                attendances: initializeServiceAttendance(), totalCalculated: 0, totalFromText: null
+            };
+            if(foundService) serviceToAdd.attendances = foundService.attendances;
+            serviceToAdd.totalCalculated = Object.values(serviceToAdd.attendances).reduce((sum, val) => sum + val, 0);
+            processedDataGlobal.push(serviceToAdd);
+        });
+
+        const dentalServiceInput = tempProcessedData.find(s => s.name.toUpperCase() === DENTAL_SERVICE_DISPLAY_NAME.toUpperCase() && s.type === "Odontológico");
+        const dentalServiceToAdd = dentalServiceInput || {
+            id: dentalServiceInput ? dentalServiceInput.id : '-',
+            name: DENTAL_SERVICE_DISPLAY_NAME, type: "Odontológico",
+            attendances: initializeServiceAttendance(), totalCalculated: 0, totalFromText: null
+        };
+        if(dentalServiceInput) dentalServiceToAdd.attendances = dentalServiceInput.attendances;
+        dentalServiceToAdd.totalCalculated = Object.values(dentalServiceToAdd.attendances).reduce((sum, val) => sum + val, 0);
+        processedDataGlobal.push(dentalServiceToAdd);
+        
+        console.log("Dados processados finais (para display e metas):", JSON.parse(JSON.stringify(processedDataGlobal)));
+
+        const validDataExists = processedDataGlobal.some(service => service.type !== "Desconhecido" && service.totalCalculated > 0) || 
+                                MEDICAL_SERVICES_FOR_TABLE_DISPLAY.length > 0 || 
+                                NON_MEDICAL_SERVICES_FOR_TABLE_DISPLAY.filter(s => s !== "ASSISTENTE SOCIAL").length > 0 ||
+                                processedDataGlobal.some(s => s.name === DENTAL_SERVICE_DISPLAY_NAME);
+
+
+        if (validDataExists) { 
+            renderSeparateTables();
+            calculateAndDisplayGoals(); 
+            resultsArea.classList.remove('d-none');
+            showToast('Dados processados com sucesso!');
+        } else {
+            resultsArea.classList.add('d-none');
+            showToast('Nenhum serviço das listas de exibição foi encontrado ou teve produção.');
+        }
+    }
+
+
+    function renderSeparateTables() {
+        const medicalDataForTable = MEDICAL_SERVICES_FOR_TABLE_DISPLAY.map(displayName => {
+            return processedDataGlobal.find(s => s.name.toUpperCase() === displayName.toUpperCase() && s.type === 'Médico') ||
+                   { id: '-', name: displayName, type: 'Médico', attendances: initializeServiceAttendance(), totalCalculated: 0, totalFromText: null };
+        });
+
+        const nonMedicalDataForTable = NON_MEDICAL_SERVICES_FOR_TABLE_DISPLAY
+            .filter(displayName => displayName.toUpperCase() !== "ASSISTENTE SOCIAL") 
+            .map(displayName => {
+                return processedDataGlobal.find(s => s.name.toUpperCase() === displayName.toUpperCase() && s.type === 'Não Médico') ||
+                       { id: '-', name: displayName, type: 'Não Médico', attendances: initializeServiceAttendance(), totalCalculated: 0, totalFromText: null };
+            });
+        
+        const dentalDataForTable = [
+            processedDataGlobal.find(s => s.name.toUpperCase() === DENTAL_SERVICE_DISPLAY_NAME.toUpperCase() && s.type === 'Odontológico') ||
+            { id: '-', name: DENTAL_SERVICE_DISPLAY_NAME, type: 'Odontológico', attendances: initializeServiceAttendance(), totalCalculated: 0, totalFromText: null }
+        ];
+
+
+        populateSpecificTable(medicalTableHeadEl, medicalTableBodyEl, medicalTableFootEl, medicalDataForTable, MEDICAL_TABLE_DISPLAY_COLUMNS);
+        populateSpecificTable(nonMedicalTableHeadEl, nonMedicalTableBodyEl, nonMedicalTableFootEl, nonMedicalDataForTable, NON_MEDICAL_TABLE_DISPLAY_COLUMNS);
+        populateSpecificTable(dentalTableHeadEl, dentalTableBodyEl, dentalTableFootEl, dentalDataForTable, DENTAL_TABLE_DISPLAY_COLUMNS, true); 
+    }
+
+    function populateSpecificTable(theadEl, tbodyEl, tfootEl, dataToDisplay, displayColumns, isDental = false) {
+        theadEl.innerHTML = '';
+        tbodyEl.innerHTML = '';
+        tfootEl.innerHTML = '';
+
+        const headerRow = theadEl.insertRow();
+        const totalColName = isDental ? "Total do Serviço" : "Total";
+        const headers = ["Serviço", ...displayColumns, totalColName]; 
+        headers.forEach(text => {
+            const th = document.createElement('th');
+            th.className = "px-3 py-2 text-start text-xs font-medium text-secondary-emphasis text-uppercase"; 
+            th.textContent = text;
+            headerRow.appendChild(th);
+        });
+
+        const grandTotals = {};
+        displayColumns.forEach(col => grandTotals[col] = 0);
+        let grandTotalDisplayedServices = 0;
+
+        dataToDisplay.forEach(serviceData => {
+            const row = tbodyEl.insertRow();
+            row.insertCell().textContent = `${serviceData.id !== '-' ? serviceData.id : ''} ${serviceData.name}`;
+            
+            let currentServiceDisplayedTotal = 0;
+            if (isDental) {
+                const primeiraConsulta = serviceData.attendances["Primeira Consulta"] || 0;
+                const consultaSubsequente = (serviceData.attendances["Retorno"] || 0) + (serviceData.attendances["Interconsulta"] || 0);
+                row.insertCell().textContent = primeiraConsulta;
+                row.insertCell().textContent = consultaSubsequente;
+                grandTotals["Primeira Consulta"] = (grandTotals["Primeira Consulta"] || 0) + primeiraConsulta;
+                grandTotals["Consulta Subsequente"] = (grandTotals["Consulta Subsequente"] || 0) + consultaSubsequente;
+                currentServiceDisplayedTotal = primeiraConsulta + consultaSubsequente;
+            } else {
+                displayColumns.forEach(colName => {
+                    const qty = serviceData.attendances[colName] || 0;
+                    row.insertCell().textContent = qty;
+                    grandTotals[colName] += qty; 
+                    currentServiceDisplayedTotal += qty; 
+                });
+            }
+            row.insertCell().textContent = currentServiceDisplayedTotal; 
+            grandTotalDisplayedServices += currentServiceDisplayedTotal;
+        });
+
+        if (dataToDisplay.length > 0) {
+            const footerRow = tfootEl.insertRow();
+            const firstCell = footerRow.insertCell();
+            firstCell.textContent = "TOTAIS";
+            firstCell.className = "fw-bold";
+
+            displayColumns.forEach(colName => {
+                const cell = footerRow.insertCell();
+                cell.textContent = grandTotals[colName] || 0;
+                cell.className = "fw-bold";
+            });
+            const totalCell = footerRow.insertCell();
+            totalCell.textContent = grandTotalDisplayedServices; 
+            totalCell.className = "fw-bold";
+        }
+    }
+
+
+    function calculateAndDisplayGoals() {
+        let totalMedicalForGoal = 0;
+        let totalNonMedicalForGoal = 0;
+        let dentalFirstConsultActual = 0;
+        let dentalSubsequentActual = 0;
+        
+        processedDataGlobal.forEach(service => {
+            const serviceNameForMetaCheck = service.name.toUpperCase(); 
+
+            if (service.type === 'Médico') {
+                MEDICAL_GOAL_TYPES.forEach(type => totalMedicalForGoal += service.attendances[type] || 0);
+            } else if (service.type === 'Não Médico') {
+                if (serviceNameForMetaCheck !== "ASSISTENTE SOCIAL") { 
+                    NON_MEDICAL_GOAL_TYPES.forEach(type => totalNonMedicalForGoal += service.attendances[type] || 0);
+                }
+            } else if (service.type === 'Odontológico' && serviceNameForMetaCheck === DENTAL_SERVICE_DISPLAY_NAME.toUpperCase()) {
+                dentalFirstConsultActual += service.attendances["Primeira Consulta"] || 0;
+                dentalSubsequentActual += (service.attendances["Retorno"] || 0) + (service.attendances["Interconsulta"] || 0);
+            }
+        });
+
+        medicalGoalActualEl.textContent = totalMedicalForGoal.toLocaleString('pt-BR');
+        const medicalRemaining = MEDICAL_GOAL_TARGET_VALUE - totalMedicalForGoal;
+        medicalGoalStatusEl.textContent = medicalRemaining <= 0 ? `Meta Atingida! (${Math.abs(medicalRemaining).toLocaleString('pt-BR')} acima)` : `Faltam ${medicalRemaining.toLocaleString('pt-BR')}`;
+        medicalGoalStatusEl.className = `text-center fw-bold mt-1 ${medicalRemaining <= 0 ? 'goal-met' : 'goal-not-met'}`;
+        const medicalPercent = MEDICAL_GOAL_TARGET_VALUE > 0 ? Math.min(100, (totalMedicalForGoal / MEDICAL_GOAL_TARGET_VALUE) * 100) : 0;
+        updateDoughnutChart(medicalGoalChartInstance, 'medicalGoalChart', medicalPercent, 'var(--bs-primary)');
+
+        nonMedicalGoalActualEl.textContent = totalNonMedicalForGoal.toLocaleString('pt-BR');
+        const nonMedicalRemaining = NON_MEDICAL_GOAL_TARGET_VALUE - totalNonMedicalForGoal;
+        nonMedicalGoalStatusEl.textContent = nonMedicalRemaining <= 0 ? `Meta Atingida! (${Math.abs(nonMedicalRemaining).toLocaleString('pt-BR')} acima)` : `Faltam ${nonMedicalRemaining.toLocaleString('pt-BR')}`;
+        nonMedicalGoalStatusEl.className = `text-center fw-bold mt-1 ${nonMedicalRemaining <= 0 ? 'goal-met' : 'goal-not-met'}`;
+        const nonMedicalPercent = NON_MEDICAL_GOAL_TARGET_VALUE > 0 ? Math.min(100, (totalNonMedicalForGoal / NON_MEDICAL_GOAL_TARGET_VALUE) * 100) : 0;
+        updateDoughnutChart(nonMedicalGoalChartInstance, 'nonMedicalGoalChart', nonMedicalPercent, 'var(--bs-success)');
+        
+        dentalFirstConsultActualEl.textContent = dentalFirstConsultActual.toLocaleString('pt-BR');
+        dentalSubsequentConsultActualEl.textContent = dentalSubsequentActual.toLocaleString('pt-BR');
+        const totalDentalActual = dentalFirstConsultActual + dentalSubsequentActual;
+        dentalGoalActualEl.textContent = totalDentalActual.toLocaleString('pt-BR');
+        const dentalRemaining = DENTAL_TOTAL_GOAL_TARGET - totalDentalActual;
+        dentalGoalStatusEl.textContent = dentalRemaining <= 0 ? `Meta Geral Atingida! (${Math.abs(dentalRemaining).toLocaleString('pt-BR')} acima)` : `Faltam ${dentalRemaining.toLocaleString('pt-BR')} para Meta Geral`;
+        dentalGoalStatusEl.className = `text-center fw-bold mt-1 ${dentalRemaining <= 0 ? 'goal-met' : 'goal-not-met'}`;
+        const dentalPercent = DENTAL_TOTAL_GOAL_TARGET > 0 ? Math.min(100, (totalDentalActual / DENTAL_TOTAL_GOAL_TARGET) * 100) : 0;
+        updateDoughnutChart(dentalGoalChartInstance, 'dentalGoalChart', dentalPercent, 'var(--bs-info)');
+
+        updateSpecialtyBarCharts();
+        fetchGeminiSuggestions(totalMedicalForGoal, medicalPercent, medicalRemaining, totalNonMedicalForGoal, nonMedicalPercent, nonMedicalRemaining, totalDentalActual, dentalPercent, dentalRemaining, dentalFirstConsultActual, dentalSubsequentActual);
+    }
+    
+    function updateSpecialtyBarCharts() {
+        const medicalServicesData = MEDICAL_SERVICES_FOR_TABLE_DISPLAY.map(displayName => {
+            const service = processedDataGlobal.find(s => s.name === displayName && s.type === 'Médico');
+            if (!service) return { label: displayName, value: 0 };
+            const value = MEDICAL_GOAL_TYPES.reduce((sum, type) => sum + (service.attendances[type] || 0), 0);
+            return { label: displayName, value: value };
+        }).filter(s => s.value > 0); 
+
+        if (medicalSpecialtyChartInstance) medicalSpecialtyChartInstance.destroy();
+        if (medicalServicesData.length > 0 && document.getElementById('medicalSpecialtyChart')) {
+            medicalSpecialtyChartInstance = new Chart(document.getElementById('medicalSpecialtyChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: medicalServicesData.map(s => s.label),
+                    datasets: [{
+                        label: 'Atendimentos Válidos (Meta)',
+                        data: medicalServicesData.map(s => s.value),
+                        backgroundColor: 'rgba(0, 123, 255, 0.7)',
+                        borderColor: 'rgba(0, 123, 255, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+            });
+        }
+
+        const nonMedicalServicesData = NON_MEDICAL_SERVICES_FOR_TABLE_DISPLAY
+            .filter(displayName => displayName.toUpperCase() !== "ASSISTENTE SOCIAL")
+            .map(displayName => {
+                const service = processedDataGlobal.find(s => s.name === displayName && s.type === 'Não Médico');
+                if (!service) return { label: displayName, value: 0 };
+                const value = NON_MEDICAL_GOAL_TYPES.reduce((sum, type) => sum + (service.attendances[type] || 0), 0);
+                return { label: displayName, value: value };
+            }).filter(s => s.value > 0);
+
+        if (nonMedicalServiceChartInstance) nonMedicalServiceChartInstance.destroy();
+        if (nonMedicalServicesData.length > 0 && document.getElementById('nonMedicalServiceChart')) {
+            nonMedicalServiceChartInstance = new Chart(document.getElementById('nonMedicalServiceChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: nonMedicalServicesData.map(s => s.label),
+                    datasets: [{
+                        label: 'Atendimentos Válidos (Meta)',
+                        data: nonMedicalServicesData.map(s => s.value),
+                        backgroundColor: 'rgba(25, 135, 84, 0.7)',
+                        borderColor: 'rgba(25, 135, 84, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+            });
+        }
+        
+        // Novo Gráfico de Barras para Odontologia
+        const dentalService = processedDataGlobal.find(s => s.name.toUpperCase() === DENTAL_SERVICE_DISPLAY_NAME.toUpperCase() && s.type === 'Odontológico');
+        if (dentalAttendanceChartInstance) dentalAttendanceChartInstance.destroy();
+        if (dentalService && document.getElementById('dentalAttendanceChart')) {
+            const dentalAttendanceData = [
+                { label: "Primeira Consulta", value: dentalService.attendances["Primeira Consulta"] || 0 },
+                { label: "Consulta Subsequente", value: (dentalService.attendances["Retorno"] || 0) + (dentalService.attendances["Interconsulta"] || 0) }
+            ];
+            dentalAttendanceChartInstance = new Chart(document.getElementById('dentalAttendanceChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: dentalAttendanceData.map(d => d.label),
+                    datasets: [{
+                        label: 'Nº de Atendimentos',
+                        data: dentalAttendanceData.map(d => d.value),
+                        backgroundColor: ['rgba(23, 162, 184, 0.7)', 'rgba(23, 162, 184, 0.5)'],
+                        borderColor: ['rgba(23, 162, 184, 1)', 'rgba(23, 162, 184, 0.8)'],
+                        borderWidth: 1
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+            });
+        }
+
+
+    }
+
+    async function fetchGeminiSuggestions(totalMedical, medicalPercent, medicalRemaining, totalNonMedical, nonMedicalPercent, nonMedicalRemaining, totalDental, dentalPercent, dentalRemaining, dentalFirst, dentalSubsequent) {
+        geminiLoader.classList.remove('d-none');
+        geminiOutput.innerHTML = 'A buscar análise e sugestões...';
+        const prompt = `
+        Análise de Metas de Atendimento em Saúde Pública:
+        Especialidades Médicas:
+        - Tipos de atendimento contabilizados para a meta: ${MEDICAL_GOAL_TYPES.join(', ')}.
+        - Total de atendimentos atual: ${totalMedical.toLocaleString('pt-BR')}.
+        - Meta de atendimentos: ${MEDICAL_GOAL_TARGET_VALUE.toLocaleString('pt-BR')}.
+        - Percentagem da meta atingida: ${medicalPercent.toFixed(1)}%.
+        - Atendimentos restantes: ${medicalRemaining.toLocaleString('pt-BR')}.
+        Serviços Não Médicos (excluindo Assistente Social da meta):
+        - Tipos de atendimento contabilizados para a meta: ${NON_MEDICAL_GOAL_TYPES.join(', ')}.
+        - Total de atendimentos atual: ${totalNonMedical.toLocaleString('pt-BR')}.
+        - Meta de atendimentos: ${NON_MEDICAL_GOAL_TARGET_VALUE.toLocaleString('pt-BR')}.
+        - Percentagem da meta atingida: ${nonMedicalPercent.toFixed(1)}%.
+        - Atendimentos restantes: ${nonMedicalRemaining.toLocaleString('pt-BR')}.
+        Odontologia:
+        - Meta Primeira Consulta: ${DENTAL_FIRST_CONSULT_TARGET}. Atendimentos atuais: ${dentalFirst}.
+        - Meta Consulta Subsequente (Retorno + Interconsulta): ${DENTAL_SUBSEQUENT_CONSULT_TARGET}. Atendimentos atuais: ${dentalSubsequent}.
+        - Meta Total Odontologia: ${DENTAL_TOTAL_GOAL_TARGET}. Total atual: ${totalDental}.
+        - Percentagem da meta total atingida: ${dentalPercent.toFixed(1)}%.
+        - Atendimentos restantes para meta total: ${dentalRemaining.toLocaleString('pt-BR')}.
+        Por favor, forneça uma breve análise textual sobre o progresso em relação a cada uma dessas três categorias de metas (Médica, Não Médica, Odontologia), incluindo as percentagens atingidas. Em seguida, ofereça de 2 a 3 dicas de ações específicas e práticas para cada categoria, visando ajudar a unidade a atingir as metas restantes. Se uma meta específica (ex: Primeira Consulta Odonto) ou uma meta de categoria geral foi atingida, parabenize e sugira como manter ou melhorar. Formate a resposta de forma clara, usando parágrafos para a análise geral e, em seguida, seções distintas para "Especialidades Médicas", "Serviços Não Médicos" e "Odontologia", com bullet points para as dicas de cada uma.`;
+        try {
+            let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+            const payload = { contents: chatHistory };
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`API Gemini: ${response.status} ${response.statusText}. ${errorData.error?.message || ''}`);
+            }
+            const result = await response.json();
+            if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
+                geminiOutput.innerHTML = result.candidates[0].content.parts[0].text.replace(/\n/g, '<br>');
+            } else {
+                geminiOutput.textContent = 'Resposta da API Gemini em formato inesperado.';
+            }
+        } catch (error) {
+            console.error('Erro API Gemini:', error);
+            geminiOutput.innerHTML = `<p class="text-danger">Erro ao buscar sugestões: ${error.message}.</p>`;
+        } finally {
+            geminiLoader.classList.add('d-none');
+        }
+    }
+
+    function updateDoughnutChart(chartInstance, canvasId, percentageAchieved, achievedColor) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        const percentageRemaining = Math.max(0, 100 - percentageAchieved);
+        const data = {
+            labels: ['Atingido', 'Faltante'],
+            datasets: [{
+                data: [percentageAchieved, percentageRemaining],
+                backgroundColor: [achievedColor, 'rgba(220, 53, 69, 0.6)'], 
+                borderColor: ['#ffffff'],
+                borderWidth: 2,
+                hoverOffset: 4
+            }]
+        };
+        const config = {
+            type: 'doughnut',
+            data: data,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { 
+                        callbacks: { label: (context) => `${context.label}: ${context.raw.toFixed(1)}%` },
+                        backgroundColor: 'rgba(0,0,0,0.7)',
+                        titleFont: { size: 14 },
+                        bodyFont: { size: 12 },
+                        padding: 10
+                    }
+                },
+                cutout: '70%'
+            }
+        };
+        if (canvasId === 'medicalGoalChart') {
+            if (medicalGoalChartInstance) medicalGoalChartInstance.destroy();
+            medicalGoalChartInstance = new Chart(ctx, config);
+        } else if (canvasId === 'nonMedicalGoalChart') {
+            if (nonMedicalGoalChartInstance) nonMedicalGoalChartInstance.destroy();
+            nonMedicalGoalChartInstance = new Chart(ctx, config);
+        } else if (canvasId === 'dentalGoalChart') {
+            if (dentalGoalChartInstance) dentalGoalChartInstance.destroy();
+            dentalGoalChartInstance = new Chart(ctx, config);
+        }
+    }
+    
+    exportCSVButton.addEventListener('click', () => {
+        if (processedDataGlobal.length === 0) { showToast('Nenhum dado para exportar.'); return; }
+        let csvContent = "\uFEFF"; 
+        const allPossibleParsedTypes = ALL_POSSIBLE_PARSED_TYPES;
+        const headers = ["ID Servico", "Nome Servico", "Tipo Servico", ...allPossibleParsedTypes, "Total Calculado (Geral)", "Total Informado Texto"];
+        csvContent += headers.join(",") + "\r\n";
+        
+        processedDataGlobal.forEach(service => {
+            const row = [
+                service.id, `"${service.name.replace(/"/g, '""')}"`, service.type,
+                ...allPossibleParsedTypes.map(col => service.attendances[col] || 0),
+                service.totalCalculated, 
+                service.totalFromText !== null ? service.totalFromText : ''
+            ];
+            csvContent += row.join(",") + "\r\n";
+        });
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "relatorio_atendimentos_mediflow.csv";
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        showToast('CSV exportado com sucesso!');
+    });
+
+    exportPDFButton.addEventListener('click', () => {
+        if (processedDataGlobal.length === 0) { showToast('Nenhum dado para exportar.'); return; }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape' });
+        let startY = 15; 
+        const logoImg = new Image();
+        logoImg.crossOrigin = "anonymous"; 
+        logoImg.src = "https://storage.googleapis.com/generativeai-downloads/images/d58dce57-5745-4aca-a55e-8b4cea39eb10";
+        
+        const addContentToPdf = () => {
+            if (logoImg.complete && logoImg.naturalHeight !== 0) {
+                const logoWidth = 40; 
+                const logoHeight = (logoImg.height * logoWidth) / logoImg.width;
+                try { doc.addImage(logoImg, 'PNG', 14, 10, logoWidth, logoHeight); } catch(e) { console.error("Erro ao adicionar logo ao PDF:", e); }
+                startY = 10 + logoHeight + 5; 
+            } else {
+                startY = 25; 
+            }
+
+            doc.setFontSize(18); doc.setTextColor(33, 37, 41); 
+            doc.text("Relatório de Análise de Atendimentos - MediFlow Tech", doc.internal.pageSize.getWidth() / 2, startY, { align: 'center' });
+            startY += 12;
+            doc.setFontSize(11); doc.text("Progresso das Metas:", 14, startY); startY += 7;
+            doc.setFontSize(9);
+            doc.text(`Especialidades Médicas: ${medicalGoalActualEl.textContent} de ${MEDICAL_GOAL_TARGET_VALUE.toLocaleString('pt-BR')} (${medicalGoalStatusEl.textContent.replace("Faltam ","").replace("Meta Atingida! (","").replace(" acima)","")})`, 16, startY); startY += 5;
+            doc.text(`Serviços Não Médicos: ${nonMedicalGoalActualEl.textContent} de ${NON_MEDICAL_GOAL_TARGET_VALUE.toLocaleString('pt-BR')} (${nonMedicalGoalStatusEl.textContent.replace("Faltam ","").replace("Meta Atingida! (","").replace(" acima)","")})`, 16, startY); startY += 5;
+            doc.text(`Odontologia (Total): ${dentalGoalActualEl.textContent} de ${DENTAL_TOTAL_GOAL_TARGET.toLocaleString('pt-BR')} (${dentalGoalStatusEl.textContent.replace("Faltam ","").replace("Meta Geral Atingida! (","").replace(" acima)","").replace(" para Meta Geral","")})`, 16, startY); startY += 5;
+            doc.text(`  ∟ Primeira Consulta: ${dentalFirstConsultActualEl.textContent}/${DENTAL_FIRST_CONSULT_TARGET} | Consulta Subsequente: ${dentalSubsequentConsultActualEl.textContent}/${DENTAL_SUBSEQUENT_CONSULT_TARGET}`, 20, startY);
+            startY += 10;
+            
+            const chartsToAddToPdf = [
+                { instance: medicalGoalChartInstance, x: 14, y: startY, w: 50, h: 40 },
+                { instance: nonMedicalGoalChartInstance, x: 74, y: startY, w: 50, h: 40 },
+                { instance: dentalGoalChartInstance, x: 134, y: startY, w: 50, h: 40 }
+            ];
+            let chartMaxY = startY;
+            chartsToAddToPdf.forEach(c => {
+                if (c.instance && c.instance.canvas) {
+                    try { doc.addImage(c.instance.toBase64Image(), 'PNG', c.x, c.y, c.w, c.h); chartMaxY = Math.max(chartMaxY, c.y + c.h); }
+                    catch(e) { console.error("Erro ao adicionar gráfico de rosca ao PDF", e); }
+                }
+            });
+            startY = chartMaxY + 10;
+
+            // Adicionar gráficos de barra por especialidade/serviço ao PDF
+            if (medicalSpecialtyChartInstance && medicalSpecialtyChartInstance.canvas) {
+                if (startY + 70 > doc.internal.pageSize.getHeight() - 15) { doc.addPage(); startY = 20; }
+                doc.setFontSize(11); doc.text("Atendimentos por Especialidade Médica (Meta)", 14, startY); startY += 6;
+                try { doc.addImage(medicalSpecialtyChartInstance.toBase64Image(), 'PNG', 14, startY, 130, 65); startY += 75; } // Ajustar dimensões
+                catch(e) { console.error("Erro ao adicionar gráfico de esp. médica ao PDF", e); }
+            }
+            if (nonMedicalServiceChartInstance && nonMedicalServiceChartInstance.canvas) {
+                 if (startY + 70 > doc.internal.pageSize.getHeight() - 15) { doc.addPage(); startY = 20; }
+                doc.setFontSize(11); doc.text("Atendimentos por Serviço Não Médico (Meta)", 14, startY); startY += 6;
+                try { doc.addImage(nonMedicalServiceChartInstance.toBase64Image(), 'PNG', 14, startY, 130, 65); startY += 75; }
+                catch(e) { console.error("Erro ao adicionar gráfico de serv. não médico ao PDF", e); }
+            }
+             if (dentalAttendanceChartInstance && dentalAttendanceChartInstance.canvas) {
+                 if (startY + 50 > doc.internal.pageSize.getHeight() - 15) { doc.addPage(); startY = 20; }
+                doc.setFontSize(11); doc.text("Atendimentos Odontologia (Tipos)", 14, startY); startY += 6;
+                try { doc.addImage(dentalAttendanceChartInstance.toBase64Image(), 'PNG', 14, startY, 100, 50); startY += 60; }
+                catch(e) { console.error("Erro ao adicionar gráfico de odonto (tipos) ao PDF", e); }
+            }
+
+
+            const addTableToPdf = (title, data, displayColumns, isMedical, isDental = false) => {
+                if (startY + 20 > doc.internal.pageSize.getHeight() - 15) { doc.addPage(); startY = 20; }
+                doc.setFontSize(12); doc.text(title, 14, startY); startY += 7;
+                const cols = ["Serviço", ...displayColumns, "Total"];
+                const rows = data.map(service => {
+                    const displayedTotal = displayColumns.reduce((sum, col) => sum + (service.attendances[col] || 0), 0);
+                    return [`${service.id !== '-' ? service.id : ''} ${service.name}`, ...displayColumns.map(col => service.attendances[col] || 0), displayedTotal];
+                });
+                let headFillColor = isMedical ? [0, 123, 255] : [25, 135, 84];
+                if (isDental) headFillColor = [23, 162, 184]; 
+
+                doc.autoTable({
+                    head: [cols], body: rows, startY: startY, theme: 'grid',
+                    headStyles: { fillColor: headFillColor, textColor: 255, fontStyle: 'bold' },
+                    styles: { fontSize: 6, cellPadding: 1, overflow: 'linebreak' }, 
+                    columnStyles: { 0: { cellWidth: 40 } } 
+                });
+                startY = doc.lastAutoTable.finalY + 10;
+            };
+            
+            const medicalDataForPdf = MEDICAL_SERVICES_FOR_TABLE_DISPLAY.map(displayName => processedDataGlobal.find(s => s.name === displayName && s.type === 'Médico') || { id: '-', name: displayName, type: 'Médico', attendances: initializeServiceAttendance() });
+            addTableToPdf("Especialidades Médicas", medicalDataForPdf, MEDICAL_TABLE_DISPLAY_COLUMNS, true);
+
+            const nonMedicalDataForPdf = NON_MEDICAL_SERVICES_FOR_TABLE_DISPLAY.filter(name => name.toUpperCase() !== "ASSISTENTE SOCIAL").map(displayName => processedDataGlobal.find(s => s.name === displayName && s.type === 'Não Médico') || { id: '-', name: displayName, type: 'Não Médico', attendances: initializeServiceAttendance() });
+            addTableToPdf("Serviços Não Médicos", nonMedicalDataForPdf, NON_MEDICAL_TABLE_DISPLAY_COLUMNS, false);
+            
+            const dentalDataForPdf = [processedDataGlobal.find(s => s.name.toUpperCase() === DENTAL_SERVICE_DISPLAY_NAME.toUpperCase() && s.type === 'Odontológico') || { id: '-', name: DENTAL_SERVICE_DISPLAY_NAME, type: 'Odontológico', attendances: initializeServiceAttendance() }];
+            addTableToPdf("Odontologia", dentalDataForPdf, DENTAL_TABLE_DISPLAY_COLUMNS, false, true);
+
+
+            const geminiContent = geminiOutput.innerHTML.replace(/<br\s*\/?>/gi, "\n");
+            if (geminiContent && geminiContent !== 'Aguardando processamento dos dados...' && !geminiContent.startsWith("Erro")) {
+                 if (startY + 10 > doc.internal.pageSize.getHeight() - 15) { doc.addPage(); startY = 15; }
+                 doc.setFontSize(11); doc.text("Análise e Sugestões (IA):", 14, startY); startY += 6;
+                 doc.setFontSize(8);
+                 var splitSuggestions = doc.splitTextToSize(geminiContent, doc.internal.pageSize.getWidth() - 28);
+                 doc.text(splitSuggestions, 14, startY);
+            }
+
+
+            doc.save("relatorio_atendimentos_mediflow.pdf");
+            showToast('PDF exportado com sucesso!');
+        };
+        
+        let logoLoaded = false;
+        logoImg.onload = () => { logoLoaded = true; addContentToPdf(); };
+        logoImg.onerror = () => { console.error("Falha ao carregar o logo para o PDF."); addContentToPdf(); };
+        if (logoImg.complete || logoImg.width > 0) { if(!logoLoaded) addContentToPdf(); } 
+        else { setTimeout(() => { if (!logoLoaded) { console.warn("Timeout ao carregar logo."); addContentToPdf();}}, 2000); }
+    });
+</script>
+</body>
+</html>
